@@ -69,8 +69,11 @@ class Migration {
             return;
         }
 
-        // создаем резервную копию базы данных
-        $this->backup();
+        // создаем резервную копию текущего состояния
+        if (!$this->isEmpty()) {
+            $this->backup();
+            echo PHP_EOL;
+        }
 
         echo 'Start database migration', PHP_EOL;
         // выполняем SQL-запросы из каждого файла
@@ -86,27 +89,29 @@ class Migration {
      * Функция показывает список SQL-файлов для миграций
      */
     public function state() {
+        // выводим список старых файлов
         $oldFiles = $this->getOldFiles();
-        echo 'Old migrate files:', PHP_EOL;
+        echo 'Old files in folder ' . $this->sqlDir . ':';
         if (!empty($oldFiles)) {
             $i = 1;
             foreach ($oldFiles as $file) {
-                echo '    ', $i, '. ', basename($file), PHP_EOL;
+                echo PHP_EOL, '    ', $i, '. ', basename($file);
                 $i++;
             }
         } else {
-            echo '    There are no old files', PHP_EOL;
+            echo PHP_EOL, '    Old files not found';
         }
+        // выводим список новых файлов
         $newFiles = $this->getNewFiles();
-        echo 'New migrate files:', PHP_EOL;
+        echo PHP_EOL, 'New files in folder ' . $this->sqlDir . ':';
         if (!empty($newFiles)) {
             $i = 1;
             foreach ($newFiles as $file) {
-                echo '    ', $i, '. ', basename($file), PHP_EOL;
+                echo PHP_EOL, '    ', $i, '. ', basename($file);
                 $i++;
             }
         } else {
-            echo '    There are no new files';
+            echo PHP_EOL, '    New files not found';
         }
     }
     
@@ -116,6 +121,7 @@ class Migration {
     public function backup() {
         // резервную копию создаем, если в БД есть таблицы
         if ($this->isEmpty()) {
+            echo 'No tables found in database, nothing to do';
             return;
         }
         // предупреждаем, если резервных копий накопилось много
@@ -124,12 +130,14 @@ class Migration {
             echo 'Warning! Too many backup files', PHP_EOL;
         }
         // выполняем команду mysqldump
-        echo 'Create backup of current state', PHP_EOL;
+        echo 'Create backup of current state';
         $backupName = $this->backupDir . $this->name . '-' . date('d.m.Y-H.i.s') . '.sql';
         if ($this->pass != '') {
-            $command = 'mysqldump -u'.$this->user.' -p'.$this->pass.' -h '.$this->host.' -B '.$this->name.' > '.$backupName;
+            $command = 'mysqldump -u' . $this->user . ' -p' . $this->pass . ' -h ' . $this->host .
+                       ' -B ' . $this->name . ' > ' . $backupName;
         } else {
-            $command = 'mysqldump -u'.$this->user.' -h '.$this->host.' -B '.$this->name.' > '.$backupName;
+            $command = 'mysqldump -u' . $this->user . ' -h ' . $this->host .
+                       ' -B ' . $this->name . ' > '.$backupName;
         }
         shell_exec($command);
     }
@@ -144,7 +152,10 @@ class Migration {
             return;
         }
         // создаем резервную копию текущего состояния
-        $this->backup();
+        if (!$this->isEmpty()) {
+            $this->backup();
+            echo PHP_EOL;
+        }
         // удаляем все таблицы из базы данных
         $query = 'SHOW TABLES';
         $rows = $this->database->fetchAll($query);
@@ -156,9 +167,11 @@ class Migration {
         // восстанавливаем базу данных
         echo 'Restore database from backup';
         if ($this->pass != '') {
-            $command = 'mysql -u'.$this->user.' -p'.$this->pass.' -h '.$this->host.' -D '.$this->name.' < '.$backupName;
+            $command = 'mysql -u' . $this->user . ' -p' . $this->pass . ' -h '.$this->host .
+                       ' -D ' . $this->name . ' < ' . $backupName;
         } else {
-            $command = 'mysql -u'.$this->user.' -h '.$this->host.' -D '.$this->name.' < '.$backupName;
+            $command = 'mysql -u' . $this->user . ' -h ' . $this->host .
+                       ' -D ' . $this->name . ' < ' . $backupName;
         }
         shell_exec($command);
     }
@@ -205,15 +218,17 @@ class Migration {
      */
     private function execute($file) {
         if ($this->pass != '') {
-            $command = 'mysql -u'.$this->user.' -p'.$this->pass.' -h '.$this->host.' -D '.$this->name.' < '.$file;
+            $command = 'mysql -u' . $this->user . ' -p' . $this->pass . ' -h ' . $this->host .
+                       ' -D ' . $this->name . ' < ' . $file;
         } else {
-            $command = 'mysql -u'.$this->user.' -h '.$this->host.' -D '.$this->name.' < '.$file;
+            $command = 'mysql -u' . $this->user . ' -h ' . $this->host .
+                       ' -D ' . $this->name . ' < ' . $file;
         }
         shell_exec($command);
 
         // добавляем запись в таблицу учета миграций, отмечая тот факт,
         // что состояние базы данных изменилось
-        $query = 'INSERT INTO `'.$this->stateTable.'` (`name`) VALUES ("'.basename($file).'")';
+        $query = 'INSERT INTO `' . $this->stateTable . '` (`name`) VALUES ("' . basename($file) . '")';
         $this->database->execute($query);
     }
 
@@ -235,9 +250,10 @@ class Migration {
             echo 'Backup files not found', PHP_EOL;
             return false;
         }
+        // выводим список всех файлов резервных копий с номерами 1,2,3,...
         echo 'Choose backup file to restore:', PHP_EOL;
         $i = 0;
-        $numbers = array();
+        $numbers = array(); // массив всех номеров файлов, для дальнейшей проверки
         foreach ($items as $item) {
             if ($item == '.' || $item == '..') {
                 continue;
@@ -246,13 +262,14 @@ class Migration {
             $numbers[] = $i;
             echo $i , '. ', $item, PHP_EOL;
         }
-        while (true) {
-            echo 'Enter backup file number: ';
+        while (true) { // пока не будет выбран правильный номер файла
+            echo 'Enter number of backup file: ';
             $number = fgets(STDIN);
-            if (in_array($number, $numbers)) {
+            if (in_array($number, $numbers)) { // проверяем корректность номера файла
                 break;
             }
         }
+        // получаем имя файла резервной копии по ее номеру в списке
         $i = 0;
         foreach ($items as $item) {
             if ($item == '.' || $item == '..') {
@@ -260,6 +277,7 @@ class Migration {
             }
             $i++;
             if ($i == $number) {
+                // возвращать будем полное имя файла резервной копии
                 $file = $this->backupDir . $item;
                 break;
             }
