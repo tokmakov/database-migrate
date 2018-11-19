@@ -260,7 +260,7 @@ class Migration {
             }
             $i++;
             $numbers[] = $i;
-            echo $i , '. ', $item, PHP_EOL;
+            echo $i, '. ', $item, PHP_EOL;
         }
         while (true) { // пока не будет выбран правильный номер файла
             echo 'Enter number of backup file: ';
