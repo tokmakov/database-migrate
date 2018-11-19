@@ -277,12 +277,10 @@ class Migration {
             }
             $i++;
             if ($i == $number) {
-                // возвращать будем полное имя файла резервной копии
-                $file = $this->backupDir . $item;
-                break;
+                // возвраем полное имя файла резервной копии
+                return $this->backupDir . $item;
             }
         }
-        return $file;
     }
 
 }
